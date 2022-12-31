@@ -32,12 +32,12 @@ This image was inspired by similar docker images from [tiangolo](https://hub.doc
 
 ### To run the server
 ```
-docker run -d -p 1935:1935 -p 8080:8080 s3gfaultx/rtmp-qsv-service
+docker run -d -p 1935:1935 -p 8080:8080 s3gfault/rtmp-qsv-service
 ```
 
 To run with custom conf file:
 ```
-docker run -d -p 1935:1935 -p 8080:8080 -v custom.conf:/etc/nginx/nginx.conf s3gfaultx/rtmp-qsv-service
+docker run -d -p 1935:1935 -p 8080:8080 -v custom.conf:/etc/nginx/nginx.conf s3gfault/rtmp-qsv-service
 ```
 where `custom.conf` is the new conf file for Nginx.
 
