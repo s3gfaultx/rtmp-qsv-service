@@ -1,12 +1,8 @@
-ARG DEBIAN_VERSION=bullseye-slim 
+FROM ubuntu:22.04 as builder
 
-FROM debian:${DEBIAN_VERSION} as builder
-
-ARG  NGINX_VERSION=1.23.3
-ARG  NGINX_RTMP_MODULE_VERSION=1.2.2
-ARG  FFMPEG_VERSION=5.1
-ARG  MEDIASDK_VERSION=22.5.4
-ARG  LIBVA_VERSION=2.16.0
+ARG NGINX_VERSION=1.23.3
+ARG NGINX_RTMP_MODULE_VERSION=1.2.2
+ARG FFMPEG_DOCKER_VERSION=2.1.0
 
 # Install dependencies
 RUN apt-get update && \
@@ -18,6 +14,12 @@ RUN apt-get update && \
 		libvorbis-dev libvpx-dev libfreetype6-dev \
 		libmp3lame-dev libx264-dev libx265-dev && \
     rm -rf /var/lib/apt/lists/*
+
+# Download ffmpeg binaries
+RUN cd /opt && \
+	wget https://github.com/AkashiSN/ffmpeg-docker/releases/download/v${FFMPEG_DOCKER_VERSION}/ffmpeg-5.0.1-qsv-linux-amd64.tar.xz && \
+	tar -xf ffmpeg-5.0.1-qsv-linux-amd64.tar.xz && \
+	rm ffmpeg-5.0.1-qsv-linux-amd64.tar.xz
 
 # Download nginx source
 RUN mkdir -p /tmp/build && \
@@ -48,95 +50,32 @@ RUN cd /tmp/build/nginx-${NGINX_VERSION} && \
     make -j $(getconf _NPROCESSORS_ONLN) && \
     make install
 
-# Download libVA source
-RUN cd /tmp/build && \
-  wget https://github.com/intel/libva/releases/download/${LIBVA_VERSION}/libva-${LIBVA_VERSION}.tar.bz2 && \
-  tar -jxf libva-${LIBVA_VERSION}.tar.bz2 && \
-  rm libva-${LIBVA_VERSION}.tar.bz2
-
-# Build libVA
-RUN cd /tmp/build/libva-${LIBVA_VERSION} && \
-  ./configure && \
-  make -j4 && \
-  make install && \
-  ldconfig
-
-# Download MediaSDK source
-RUN cd /tmp/build && \
-  wget https://github.com/Intel-Media-SDK/MediaSDK/archive/refs/tags/intel-mediasdk-${MEDIASDK_VERSION}.tar.gz && \
-  tar -zxf intel-mediasdk-${MEDIASDK_VERSION}.tar.gz && \
-  rm intel-mediasdk-${MEDIASDK_VERSION}.tar.gz
-
-# Build MediaSDK
-RUN cd /tmp/build/MediaSDK-intel-mediasdk-${MEDIASDK_VERSION} && \
-  mkdir build && \
-  cd build && \
-  cmake .. && \
-  make -j8 && \
-  make install
-
-RUN echo "/opt/intel/mediasdk/lib" > /etc/ld.so.conf.d/mediasdk.conf && \
-  ldconfig
-
-# Download ffmpeg source
-RUN cd /tmp/build && \
-  wget http://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.gz && \
-  tar -zxf ffmpeg-${FFMPEG_VERSION}.tar.gz && \
-  rm ffmpeg-${FFMPEG_VERSION}.tar.gz
-  
-# Build ffmpeg
-RUN cd /tmp/build/ffmpeg-${FFMPEG_VERSION} && \
-  export LIBVA_DRIVER_NAME=iHD && \
-  export MFX_HOME=/opt/intel/mediasdk && \
-  export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/opt/intel/mediasdk/lib/pkgconfig && \
-  ./configure \
-	  --enable-gpl \
-	  --enable-version3 \
-	  --enable-nonfree \
-	  --enable-small \
-	  --enable-libx264 \
-	  --enable-libx265 \
-	  --enable-libvpx \
-	  --enable-libtheora \
-	  --enable-libvorbis \
-	  --enable-librtmp \
-	  --enable-libmfx \
-	  --enable-postproc \
-	  --enable-swresample \ 
-	  --enable-libfreetype \
-	  --enable-libmp3lame \
-	  --disable-debug \
-	  --disable-doc \
-	  --disable-ffplay \
-	  --extra-libs="-lpthread -lm" && \
-	make -j $(getconf _NPROCESSORS_ONLN) && \
-	make install
-
 # Copy stats.xsl file to nginx html directory and cleaning build files
 RUN cp /tmp/build/nginx-rtmp-module-${NGINX_RTMP_MODULE_VERSION}/stat.xsl /usr/local/nginx/html/stat.xsl && \
 	rm -rf /tmp/build
 
-##### Building the final image #####
-FROM debian:${DEBIAN_VERSION}
+# Building the final image
+FROM ubuntu:22.04
 
 # Install dependencies
 RUN apt-get update && \
-	apt-get install -y \
-		ca-certificates openssl libpcre3-dev \
-		librtmp1 libtheora0 libvorbis-dev libmp3lame0 \
-		libvpx6 libx264-dev libx265-dev libdrm-dev && \
-    rm -rf /var/lib/apt/lists/*
+	apt-get install -y libdrm2 && \
+  apt-get autoremove -y && \
+  apt-get clean && \
+  rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /usr/share/doc/*
 
 # Copy files from build stage to final stage	
 COPY --from=builder /usr/local /usr/local
-COPY --from=builder /opt/intel/mediasdk /opt/intel/mediasdk
 COPY --from=builder /etc/nginx /etc/nginx
 COPY --from=builder /var/log/nginx /var/log/nginx
 COPY --from=builder /var/lock /var/lock
 COPY --from=builder /var/run/nginx /var/run/nginx
+COPY --from=builder /opt/ffmpeg-5.0.1-qsv-linux-amd64 /opt/ffmpeg-docker
 
-RUN echo "/opt/intel/mediasdk/lib" > /etc/ld.so.conf.d/mediasdk.conf && \
-  ldconfig
+ENV LIBVA_DRIVERS_PATH=/usr/local/lib \
+    LIBVA_DRIVER_NAME=iHD
+
+RUN ldconfig
 
 # Forward logs to Docker
 RUN ln -sf /dev/stdout /var/log/nginx/access.log && \

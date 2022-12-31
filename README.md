@@ -6,7 +6,7 @@
 
 This Docker image can be used to create a video streaming server that supports [**RTMP**](https://en.wikipedia.org/wiki/Real-Time_Messaging_Protocol), [**HLS**](https://en.wikipedia.org/wiki/HTTP_Live_Streaming), [**DASH**](https://en.wikipedia.org/wiki/Dynamic_Adaptive_Streaming_over_HTTP) out of the box. 
 It also allows adaptive streaming and custom transcoding of video streams.
-All modules are built from source on Debian Linux base images.
+All modules are built from source on Ubuntu 22.04 Linux base images.
 
 ## Features
  * The backend is [**Nginx**](http://nginx.org/en/) with [**nginx-rtmp-module**](https://github.com/arut/nginx-rtmp-module).
@@ -22,9 +22,9 @@ All modules are built from source on Debian Linux base images.
 Image is built using:
  * Nginx 1.23.3 (compiled from source)
  * Nginx-rtmp-module 1.2.2 (compiled from source)
- * FFmpeg 5.1 (compiled from source)
- * libva 2.16.0 (compiled from source)
- * Intel-Media-SDK 22.5.4 (compiled from source)
+ * FFmpeg 5.0.1
+ * libva 2.16.0
+ * Intel-Media-SDK 21.3.5
 
 This image was inspired by similar docker images from [tiangolo](https://hub.docker.com/r/tiangolo/nginx-rtmp/) and [alfg](https://hub.docker.com/r/alfg/nginx-rtmp/). It has small build size, adds support for HTTP-based streams and adaptive streaming using FFmpeg.
 
